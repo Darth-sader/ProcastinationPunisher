@@ -4,7 +4,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 import javax.swing.*;
@@ -14,6 +13,10 @@ public class ProcrastinationPunisher {
     private List<String> compliments;
     private int roastIndex = 0;
     private int complimentIndex = 0;
+    private int complimentY = 20; // Tracks y position for compliments
+    private int roastY = 20; // Tracks y position for roasts
+    private static final int SPACING = 10; // Space between messages
+    private static final int MAX_HEIGHT = Toolkit.getDefaultToolkit().getScreenSize().height - 120;
     
     public ProcrastinationPunisher() {
         loadMessages();
@@ -49,15 +52,15 @@ public class ProcrastinationPunisher {
                     SwingUtilities.invokeLater(() -> displayMessage(false));
                 }
             }
-        }, 5000, 15000); // First message in 5 sec, then every 15 sec
+        }, 5000, 15000);
     }
     
     private boolean userIsInactive() {
-        return true; // Placeholder
+        return true;
     }
     
     private boolean userIsProductive() {
-        return false; // Placeholder
+        return false;
     }
     
     private void displayMessage(boolean isRoast) {
@@ -83,11 +86,21 @@ public class ProcrastinationPunisher {
         frame.add(panel);
         frame.setSize(300, 100);
         
-        // Positioning: Compliments (Left) | Roasts (Right)
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        int x = isRoast ? screenSize.width - 320 : 20;
-        int y = new Random().nextInt(screenSize.height - 120);
-        frame.setLocation(x, y);
+        
+        if (isRoast) {
+            frame.setLocation(screenSize.width - 320, roastY);
+            roastY += 110 + SPACING;
+            if (roastY > MAX_HEIGHT) {
+                roastY = 20;
+            }
+        } else {
+            frame.setLocation(20, complimentY);
+            complimentY += 110 + SPACING;
+            if (complimentY > MAX_HEIGHT) {
+                complimentY = 20;
+            }
+        }
         
         frame.setVisible(true);
     }
