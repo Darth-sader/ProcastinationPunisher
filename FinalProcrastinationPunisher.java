@@ -12,17 +12,24 @@ public class FinalProcrastinationPunisher {
     
     private static boolean isCurrentlyRoasting = false;
     private static boolean isCurrentlyPraising = false;
-    private static final String APP_FILE = "app_classification.txt"; 
-    private static final List<String> SYSTEM_PROCESSES = List.of(
-            "explorer.exe", "svchost.exe", "runtimebroker.exe", "taskhostw.exe", 
-            "searchhost.exe", "startmenuexperiencehost.exe", "widgets.exe", "dllhost.exe", 
-            "conhost.exe", "powershell.exe", "dataexchangehost.exe", "smartscreen.exe",
-            "lpint.exe", "lpbint.exe", "lockapp.exe", "sentinelui.exe", "rtkauduservice64.exe",
-            "securityhealthsystray.exe", "shellhost.exe", "shellexperiencehost.exe", 
-            "phoneexperiencehost.exe", "widgetservice.exe", "monotificationux.exe",
-            "msedgewebview2.exe", "analyticssrv.exe", "concentr.exe", "receiver.exe", 
-            "selfserviceplugin.exe", "wfcrun32.exe", "redirector.exe", "adobecollabsync.exe"
-    );
+
+    private static long productiveStartTime = 0;
+    private static long unproductiveStartTime = 0;
+    private static final long STREAK_DURATION = 1 * 60 * 1000; // 1 minute
+
+    private static String getActiveWindowTitle() {
+        try {
+            Process process = Runtime.getRuntime().exec(
+                    "powershell -command \"(Get-Process | Where-Object { $_.MainWindowTitle -ne '' }) | Sort-Object CPU -Descending | Select-Object -First 1 | ForEach-Object { $_.MainWindowTitle }\"");
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String title = reader.readLine();
+            return title != null ? title.trim() : "";
+        } catch (IOException e) {
+            e.printStackTrace();
+            return "";
+        }
+    }
 
     private static int roastIndex = 0;
     private static int complimentIndex = 0;
@@ -46,6 +53,7 @@ public class FinalProcrastinationPunisher {
         frame.setSize(450, 200);
         frame.setLayout(new BorderLayout());
         frame.getContentPane().setBackground(new Color(45, 45, 45));
+        frame.setLocationRelativeTo(null);
 
         JButton startSessionButton = new JButton("Start Session");
         startSessionButton.setFont(new Font("Arial", Font.BOLD, 20));
@@ -136,11 +144,12 @@ public class FinalProcrastinationPunisher {
         praiseTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
+                System.out.println("Praise Timer Running");
                 if (isCurrentlyPraising) {
                     showPopup("✅ Good Job!", getRandomMessage(praises), new Color(50, 205, 50));
                 }
             }
-        }, 0, 900000); // Every 15 minutes
+        }, 0, 120000); // Every 2minutes
 
         roastTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
@@ -149,38 +158,65 @@ public class FinalProcrastinationPunisher {
                     showPopup("🔥 ROASTED!", getRandomMessage(roasts), Color.RED);
                 }
             }
-        }, 0, 900000); // Every 15 minutes
+        }, 0, 120000); // Every 2 minutes
     }
 
     private static void startMonitoring() {
-        Timer timer = new Timer();
-        timer.schedule(new TimerTask() {
+        Timer monitorTimer = new Timer();
+        monitorTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                checkRunningApps();
+                trackAppUsage();
             }
-        }, 0, 5000); // Check every 5 seconds
+        }, 0, 5000); // every 5 seconds
     }
 
-    private static void checkRunningApps() {
-        List<String> runningApps = getRunningProcesses();
-        boolean hasUnproductive = false;
-        boolean hasProductive = false;
-
-        for (String app : runningApps) {
-            if (productiveApps.contains(app)) {
-                hasProductive = true;
-            } else {
-                hasUnproductive = true;
+    private static void trackAppUsage() {
+        String activeWindow = getActiveWindowTitle().toLowerCase();
+        boolean isProductive = false;
+    
+        // Check if the active window matches any productive app
+        for (String productive : productiveApps) {
+            if (activeWindow.contains(productive.toLowerCase())) {
+                isProductive = true;
+                break;
             }
         }
-
-        if (hasUnproductive && !isCurrentlyRoasting) {
-            isCurrentlyRoasting = true;
-            isCurrentlyPraising = false;
-        } else if (!hasUnproductive && hasProductive && !isCurrentlyPraising) {
-            isCurrentlyPraising = true;
-            isCurrentlyRoasting = false;
+    
+        long currentTime = System.currentTimeMillis();
+    
+        if (isProductive) {
+            // Reset unproductive time tracking
+            unproductiveStartTime = 0;
+    
+            // If this is the first productive app detected, set the start time
+            if (productiveStartTime == 0) productiveStartTime = currentTime;
+    
+            // Check if the productive streak has reached the threshold
+            if ((currentTime - productiveStartTime) >= STREAK_DURATION) {
+                if (!isCurrentlyPraising) { // Only show praise if not already praising
+                    isCurrentlyPraising = true;
+                    isCurrentlyRoasting = false; // Reset roasting state
+                    showPopup("✅ Good Job!", getRandomMessage(praises), new Color(50, 205, 50));
+                    productiveStartTime = currentTime; // Reset to avoid repeat
+                }
+            }
+        } else {
+            // Reset productive time tracking
+            productiveStartTime = 0;
+    
+            // If this is the first unproductive app detected, set the start time
+            if (unproductiveStartTime == 0) unproductiveStartTime = currentTime;
+    
+            // Check if the unproductive streak has reached the threshold
+            if ((currentTime - unproductiveStartTime) >= STREAK_DURATION) {
+                if (!isCurrentlyRoasting) { // Only show roast if not already roasting
+                    isCurrentlyRoasting = true;
+                    isCurrentlyPraising = false; // Reset praising state
+                    showPopup("🔥 ROASTED!", getRandomMessage(roasts), Color.RED);
+                    unproductiveStartTime = currentTime; // Reset to avoid repeat
+                }
+            }
         }
     }
 
